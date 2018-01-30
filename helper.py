@@ -140,7 +140,7 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
     # Run NN on test images and save them to HD
     print('Training Finished. Saving test images to: {}'.format(output_dir))
     image_outputs = gen_test_output(
-        sess, logits, keep_prob, input_image, os.path.join(data_dir, 'stage1_train'), image_shape)
+        sess, logits, keep_prob, input_image, os.path.join(data_dir, 'stage1_test'), image_shape)
     for name, image in image_outputs:
         scipy.misc.imsave(os.path.join(output_dir, name), image)
 

@@ -115,6 +115,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
     :return: Output for for each test image
     """
     for image_file in glob(os.path.join(data_folder, '*', 'images', '*')):
+        original_shape = scipy.misc.imread(image_file).shape
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
 
         im_softmax = sess.run(
@@ -124,8 +125,8 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
         segmentation = (im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
         mask = np.dot(segmentation, np.array([[255, 255, 255]]))
         mask = scipy.misc.toimage(mask, mode="RGB")
-        #street_im = scipy.misc.toimage(image)
-        #street_im.paste(mask, box=None, mask=mask)
+        # reshaped to original size
+        mask = scipy.misc.imresize(mask, original_shape)
 
         yield os.path.basename(image_file), np.array(mask)
 

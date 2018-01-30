@@ -3,6 +3,7 @@ from glob import glob
 import os
 from skimage import util,io
 import skimage
+import csv
 
 def rle_encoding(x):
     '''

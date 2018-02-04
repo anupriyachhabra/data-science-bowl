@@ -35,7 +35,7 @@ def rle_to_string(runs):
 def prepare_submission():
     new_test_ids = []
     rles = []
-    image_paths = glob('runs/1517711178.8810756/*')
+    image_paths = glob('runs/1517723435.1895761/*')
     f = open('stage1_final_submission.csv', 'wt')
     writer = csv.writer(f)
     writer.writerow(('ImageId', 'EncodedPixels'))

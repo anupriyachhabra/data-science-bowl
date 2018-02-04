@@ -3,6 +3,7 @@ import tensorflow as tf
 import helper
 import warnings
 from distutils.version import LooseVersion
+import numpy as np
 
 
 # Check TensorFlow Version
@@ -93,6 +94,18 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     return deconv_layer_3
 
 
+# Define IoU metric
+def mean_iou(y_true, y_pred):
+    prec = []
+    for t in np.arange(0.5, 1.0, 0.05):
+        y_pred_ = tf.to_int32(y_pred > t)
+        score, up_opt = tf.metrics.mean_iou(y_true, y_pred_, 2)
+        with tf.control_dependencies([up_opt]):
+            score = tf.identity(score)
+        prec.append(score)
+    return tf.reduce_mean(tf.stack(prec), axis=0)
+
+
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
     Build the TensorFLow loss and optimizer operations.
@@ -111,11 +124,13 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 
     train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
 
-    return logits, train_op, cross_entropy_loss
+    iou = mean_iou(labels, logits)
+
+    return logits, train_op, cross_entropy_loss, iou
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
-             correct_label, keep_prob, learning_rate):
+             correct_label, keep_prob, learning_rate, iou):
     """
     Train neural network and print out the loss during training.
     :param sess: TF Session
@@ -139,12 +154,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         for images, labels in get_batches_fn(batch_size):
             #print(images.shape)
 
-            _, loss = sess.run([train_op, cross_entropy_loss],
+            _, loss, iou_val = sess.run([train_op, cross_entropy_loss, iou],
                      feed_dict={input_image: images, correct_label: labels,
                                 keep_prob: prob, learning_rate: rate})
 
             if step % display_step == 0:
-                print("Epoch: ", e, " Itr: ", step, " Loss: ",loss)
+                print("Epoch: ", e, " Itr: ", step, " Loss: ",loss, " mean_iou: ", iou_val)
             step += 1
 
 
@@ -161,8 +176,8 @@ def run():
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
 
-    batch_size = 4
-    epochs = 10
+    batch_size = 2
+    epochs = 20
 
 
     with tf.Session() as sess:
@@ -184,7 +199,7 @@ def run():
         correct_label = tf.placeholder(tf.float32, (None, image_shape[0], image_shape[1], num_classes),
                                        name='correct-label')
 
-        logits, train_op, cross_entropy_loss = optimize(last_layer, correct_label, learning_rate,
+        logits, train_op, cross_entropy_loss, iou = optimize(last_layer, correct_label, learning_rate,
                                                         num_classes)
 
 
@@ -199,7 +214,8 @@ def run():
                  input_image,
                  correct_label,
                  keep_prob,
-                 learning_rate)
+                 learning_rate,
+                 iou)
 
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)

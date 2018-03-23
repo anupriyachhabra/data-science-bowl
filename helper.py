@@ -9,7 +9,7 @@ import tensorflow as tf
 from glob import glob
 from urllib.request import urlretrieve
 from tqdm import tqdm
-
+import cv2
 
 class DLProgress(tqdm):
     last_block = 0
@@ -18,6 +18,24 @@ class DLProgress(tqdm):
         self.total = total_size
         self.update((block_num - self.last_block) * block_size)
         self.last_block = block_num
+
+def preprocess(images):
+
+    # Normalize
+    '''
+    a = -0.5
+    b = 0.5
+    min_image = np.min(images)
+    max_image = np.max(images)
+    images = a + (((images - min_image) * (b - a)) / (max_image - min_image))
+    '''
+
+    gaussian_images = []
+    for image in images:
+        gaussian_images.append(cv2.GaussianBlur(image, (3, 3), 0))
+
+
+    return gaussian_images
 
 
 def maybe_download_pretrained_vgg(data_dir):
@@ -92,7 +110,7 @@ def gen_batch_function(data_folder, image_shape):
                 images.append(image[...,:3])
                 gt_images.append(gt_image)
 
-            yield np.array(images), np.array(gt_images)
+            yield np.array(preprocess(images)), np.array(gt_images)
     return get_batches_fn
 
 def label_path (folder):
@@ -118,9 +136,13 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
         original_shape = scipy.misc.imread(image_file).shape
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
 
+        image_array = preprocess(image[...,:3])
+        # Preprocess finished
+        transformed_image_array = image_array[None, :, :, :]
+
         im_softmax = sess.run(
             [tf.nn.softmax(logits)],
-            {keep_prob: 1.0, image_pl: [image[...,:3]]})
+            {keep_prob: 1.0, image_pl: transformed_image_array})
         im_softmax = im_softmax[0][:, 1].reshape(image_shape[0], image_shape[1])
         segmentation = (im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
         mask = np.dot(segmentation, np.array([[255, 255, 255]]))
